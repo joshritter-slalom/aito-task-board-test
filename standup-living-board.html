@@ -140,26 +140,40 @@ renderRestored();
 </style>
 <script>
 (function(){
-  const originalBuildRestoredFacets=buildRestoredFacets;
   const searchControl=document.querySelector('#search');
-  function mountFilterSearch(){
+  function stableBuildRestoredFacets(){
     const box=document.querySelector('#groupIndex');
-    const heading=box?.querySelector('.facet-heading');
-    if(!box||!searchControl||!heading)return;
+    if(!box||!searchControl)return;
+    const source=restoredResults();
+    const header=document.createElement('div');
+    header.className='filter-search-header';
+    const heading=document.createElement('div');
+    heading.className='facet-heading';
     heading.textContent='Filter & Search';
-    let header=box.querySelector('.filter-search-header');
-    if(!header){
-      header=document.createElement('div');
-      header.className='filter-search-header';
-      heading.parentNode.insertBefore(header,heading);
-      header.appendChild(heading);
+    header.append(heading,searchControl);
+    const controls=document.createElement('div');
+    controls.className='facet-controls';
+    Object.entries(restoredFacetConfig).forEach(([key,info])=>{
+      const button=document.createElement('button');
+      button.type='button';button.className='facet-parent'+(restoredOpenFacet===key?' active':'');
+      button.dataset.restoredParent=key;button.setAttribute('aria-expanded',String(restoredOpenFacet===key));button.textContent=info.label;
+      controls.appendChild(button);
+    });
+    box.replaceChildren(header,controls);
+    if(restoredOpenFacet){
+      const info=restoredFacetConfig[restoredOpenFacet];
+      const panel=document.createElement('div');panel.className='facet-panel';
+      [...new Set(source.map(card=>card[info.field]))].sort((a,b)=>String(a).localeCompare(String(b))).forEach(value=>{
+        const button=document.createElement('button');
+        const active=restoredFacetState[restoredOpenFacet].has(value);
+        button.type='button';button.className='facet-link'+(active?' active':'');button.dataset.restoredFacet=restoredOpenFacet;button.dataset.restoredValue=value;button.setAttribute('aria-pressed',String(active));
+        button.textContent=value;const count=document.createElement('span');count.textContent=source.filter(card=>card[info.field]===value).length;button.appendChild(count);panel.appendChild(button);
+      });
+      box.appendChild(panel);
     }
-    if(!header.contains(searchControl))header.appendChild(searchControl);
   }
-  buildRestoredFacets=function(){originalBuildRestoredFacets();mountFilterSearch();};
-  mountFilterSearch();
-  const filterBox=document.querySelector('#groupIndex');
-  if(filterBox)new MutationObserver(mountFilterSearch).observe(filterBox,{childList:true});
+  buildRestoredFacets=stableBuildRestoredFacets;
+  stableBuildRestoredFacets();
 })();
 </script>
 </body>
