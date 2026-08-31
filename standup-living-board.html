@@ -16,7 +16,7 @@
     <div class="refresh"><span class="dot"></span><span>Synced Aug 31, 2026 · 2026-08-31T17:13:01.127Z</span></div>
   </header>
   <nav class="tabs" aria-label="Board sections"><button class="tab" aria-selected="true" data-tab="board">Live Board</button><button class="tab" aria-selected="false" data-tab="howto">How To Use</button></nav>
-  <section id="board-tab">
+<section id="board-tab">
     <div class="toolbar"><input id="search" type="search" placeholder="Search any card field or ID, e.g. STB-001 or 01" aria-label="Search any card field or ID"><select id="groupFilter"><option value="all">All groups</option></select><select id="ownerFilter"><option value="all">All owners</option></select><select id="statusFilter"><option value="all">All statuses</option></select><select id="priorityFilter"><option value="all">All priorities</option></select></div>
     <div class="summary" id="metrics"></div>
     <section><div class="section-title"><h2>Recommended priority discussion topics</h2><p>AI-selected focus for the next meeting</p></div><div class="forum" id="forum"></div></section>
@@ -184,5 +184,6 @@ renderRestored();
   stableBuildRestoredFacets();
 })();
 </script>
+<script>document.querySelector('#search')?.setAttribute('placeholder','Keyword search');</script>
 </body>
 </html>
