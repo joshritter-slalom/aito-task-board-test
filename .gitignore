@@ -1,0 +1,8 @@
+# Local working artifacts
+*.xlsx
+*.ndjson
+*.png
+*.inspect.*
+
+# Operating-system files
+.DS_Store
