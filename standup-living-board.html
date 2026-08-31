@@ -141,11 +141,11 @@ renderRestored();
 <script>
 (function(){
   const originalBuildRestoredFacets=buildRestoredFacets;
+  const searchControl=document.querySelector('#search');
   function mountFilterSearch(){
     const box=document.querySelector('#groupIndex');
-    const search=document.querySelector('#search');
     const heading=box?.querySelector('.facet-heading');
-    if(!box||!search||!heading)return;
+    if(!box||!searchControl||!heading)return;
     heading.textContent='Filter & Search';
     let header=box.querySelector('.filter-search-header');
     if(!header){
@@ -154,10 +154,12 @@ renderRestored();
       heading.parentNode.insertBefore(header,heading);
       header.appendChild(heading);
     }
-    if(!header.contains(search))header.appendChild(search);
+    if(!header.contains(searchControl))header.appendChild(searchControl);
   }
   buildRestoredFacets=function(){originalBuildRestoredFacets();mountFilterSearch();};
   mountFilterSearch();
+  const filterBox=document.querySelector('#groupIndex');
+  if(filterBox)new MutationObserver(mountFilterSearch).observe(filterBox,{childList:true});
 })();
 </script>
 </body>
