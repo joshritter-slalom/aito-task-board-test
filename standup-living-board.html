@@ -157,6 +157,7 @@ renderRestored();
       header.append(heading,searchControl);
       box.prepend(header);
     }
+    box.querySelectorAll('.facet-heading').forEach(element=>{if(!header.contains(element))element.remove();});
     const controls=document.createElement('div');
     controls.className='facet-controls';
     Object.entries(restoredFacetConfig).forEach(([key,info])=>{
