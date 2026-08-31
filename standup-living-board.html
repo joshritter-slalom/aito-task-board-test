@@ -147,12 +147,16 @@ renderRestored();
     const box=document.querySelector('#groupIndex');
     if(!box||!searchControl)return;
     const source=restoredResults();
-    const header=document.createElement('div');
-    header.className='filter-search-header';
-    const heading=document.createElement('div');
-    heading.className='facet-heading';
-    heading.textContent='Filter & Search';
-    header.append(heading,searchControl);
+    let header=box.querySelector('.filter-search-header');
+    if(!header){
+      header=document.createElement('div');
+      header.className='filter-search-header';
+      const heading=document.createElement('div');
+      heading.className='facet-heading';
+      heading.textContent='Filter & Search';
+      header.append(heading,searchControl);
+      box.prepend(header);
+    }
     const controls=document.createElement('div');
     controls.className='facet-controls';
     Object.entries(restoredFacetConfig).forEach(([key,info])=>{
@@ -161,7 +165,9 @@ renderRestored();
       button.dataset.restoredParent=key;button.setAttribute('aria-expanded',String(restoredOpenFacet===key));button.textContent=info.label;
       controls.appendChild(button);
     });
-    box.replaceChildren(header,controls);
+    box.querySelector('.facet-controls')?.remove();
+    box.querySelector('.facet-panel')?.remove();
+    header.after(controls);
     if(restoredOpenFacet){
       const info=restoredFacetConfig[restoredOpenFacet];
       const panel=document.createElement('div');panel.className='facet-panel';
@@ -171,7 +177,7 @@ renderRestored();
         button.type='button';button.className='facet-link'+(active?' active':'');button.dataset.restoredFacet=restoredOpenFacet;button.dataset.restoredValue=value;button.setAttribute('aria-pressed',String(active));
         button.textContent=value;const count=document.createElement('span');count.textContent=source.filter(card=>card[info.field]===value).length;button.appendChild(count);panel.appendChild(button);
       });
-      box.appendChild(panel);
+      controls.after(panel);
     }
   }
   buildRestoredFacets=stableBuildRestoredFacets;
