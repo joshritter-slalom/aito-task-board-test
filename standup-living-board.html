@@ -140,7 +140,9 @@ renderRestored();
 </style>
 <script>
 (function(){
-  const searchControl=document.querySelector('#search');
+  const originalSearchControl=document.querySelector('#search');
+  const searchControl=originalSearchControl?.cloneNode(true);
+  if(originalSearchControl&&searchControl){originalSearchControl.replaceWith(searchControl);searchControl.addEventListener('input',renderRestored);}
   function stableBuildRestoredFacets(){
     const box=document.querySelector('#groupIndex');
     if(!box||!searchControl)return;
