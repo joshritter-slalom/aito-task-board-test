@@ -266,8 +266,21 @@ renderRestored();
       days:totalDays===''?'Unknown':`${totalDays} ${totalDays===1?'day':'days'} open`
     };
   };
+  const ageBucketOrder=['0–7 days','8–14 days','15–30 days','31+ days'];
+  const ageBucketForCard=card=>{
+    if(isClosed(card))return '';
+    const totalDays=daysBetween(openDateForCard(card));
+    if(totalDays==='')return '';
+    if(totalDays<=7)return '0–7 days';
+    if(totalDays<=14)return '8–14 days';
+    if(totalDays<=30)return '15–30 days';
+    return '31+ days';
+  };
   cards.forEach(card=>{card.displayPriority=activePriority(card);});
+  cards.forEach(card=>{card.displayAgeBucket=ageBucketForCard(card);});
   restoredFacetConfig.priority.field='displayPriority';
+  restoredFacetState.age=restoredFacetState.age||new Set();
+  restoredFacetConfig.age={label:'By Age',field:'displayAgeBucket',order:ageBucketOrder};
 
   cardTemplate=function(featured){
     return card=>{
@@ -285,7 +298,7 @@ renderRestored();
     const box=document.querySelector('#groupIndex');
     const searchControl=document.querySelector('#search');
     if(!box||!searchControl)return;
-    const source=restoredResults();
+    const source=restoredOpenFacet==='age'?restoredResults().filter(card=>!isClosed(card)):restoredResults();
     let header=box.querySelector('.filter-search-header');
     if(!header){
       header=document.createElement('div');
@@ -310,7 +323,7 @@ renderRestored();
     header.after(controls);
     if(restoredOpenFacet){
       const info=restoredFacetConfig[restoredOpenFacet];
-      const values=[...new Set(source.map(card=>card[info.field]))].filter(value=>String(value||'').trim()).sort((a,b)=>String(a).localeCompare(String(b)));
+      const values=[...new Set(source.map(card=>card[info.field]))].filter(value=>String(value||'').trim()).sort((a,b)=>info.order?info.order.indexOf(a)-info.order.indexOf(b):String(a).localeCompare(String(b)));
       const panel=document.createElement('div');panel.className='facet-panel';
       values.forEach(value=>{
         const button=document.createElement('button');
@@ -327,7 +340,7 @@ renderRestored();
   };
 
   renderRestored=function(){
-    const visible=restoredOpenFacet==='priority'?restoredFiltered().filter(card=>activePriority(card)):restoredFiltered();
+    const visible=['priority','age'].includes(restoredOpenFacet)?restoredFiltered().filter(card=>String(card[restoredFacetConfig[restoredOpenFacet].field]||'').trim()):restoredFiltered();
     $('#metrics').innerHTML=`<div class="metric"><strong>${cards.filter(card=>card.status!=='Closed').length}</strong><span>Active topics</span></div><div class="metric"><strong>${cards.filter(card=>card.status!=='Closed'&&card.priority==='Now').length}</strong><span>Now priority</span></div><div class="metric"><strong>${cards.filter(card=>card.status==='Blocked').length}</strong><span>Blocked</span></div><div class="metric"><strong>${cards.filter(card=>!card.target&&card.status!=='Closed').length}</strong><span>Missing target</span></div>`;
     $('#forum').innerHTML=cards.filter(card=>card.forum&&card.status!=='Closed').map(cardTemplate(true)).join('');
     const groups=restoredCardGroups(visible);
