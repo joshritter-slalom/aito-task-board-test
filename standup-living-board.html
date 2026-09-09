@@ -238,6 +238,34 @@ renderRestored();
 (function(){
   const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
   const activePriority=card=>isClosed(card)?'':String(card.priority||'').trim();
+  const parseBoardDate=value=>{
+    const text=String(value||'').trim();
+    if(!text)return null;
+    const currentYear=new Date().getFullYear();
+    const candidate=/\d{4}/.test(text)?new Date(text):new Date(`${text}, ${currentYear}`);
+    return Number.isNaN(candidate.getTime())?null:candidate;
+  };
+  const formatBoardDate=date=>{
+    if(!date)return 'Unknown';
+    return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(date);
+  };
+  const startOfLocalDay=date=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const daysBetween=(start,end=new Date())=>{
+    if(!start)return '';
+    return Math.max(0,Math.floor((startOfLocalDay(end)-startOfLocalDay(start))/86400000));
+  };
+  const openDateForCard=card=>{
+    const dates=(card.history||[]).map(entry=>parseBoardDate(entry?.[0])).filter(Boolean);
+    return dates.length?new Date(Math.min(...dates.map(date=>date.getTime()))):parseBoardDate(card.last);
+  };
+  const openSummaryForCard=card=>{
+    const openDate=openDateForCard(card);
+    const totalDays=daysBetween(openDate);
+    return {
+      date:formatBoardDate(openDate),
+      days:totalDays===''?'Unknown':`${totalDays} ${totalDays===1?'day':'days'} open`
+    };
+  };
   cards.forEach(card=>{card.displayPriority=activePriority(card);});
   restoredFacetConfig.priority.field='displayPriority';
 
@@ -248,7 +276,8 @@ renderRestored();
       }
       const priority=activePriority(card);
       const priorityMarkup=priority?'<span class="chip '+priorityClass(priority)+'">'+escapeHtml(priority)+'</span>':'';
-      return '<article class="card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="card-head"><div><div class="label">'+escapeHtml(card.id)+'</div><h4>'+escapeHtml(card.topic)+'</h4></div>'+priorityMarkup+'</div><span class="chip status">'+escapeHtml(card.status)+'</span><p class="state">'+escapeHtml(card.purpose)+'</p><div class="meta"><span>Owner: '+escapeHtml(card.owner)+'</span><span class="age">'+escapeHtml(card.last)+' · '+escapeHtml(card.age)+'</span></div></article>';
+      const opened=openSummaryForCard(card);
+      return '<article class="card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="card-head"><div><div class="label">'+escapeHtml(card.id)+'</div><h4>'+escapeHtml(card.topic)+'</h4></div>'+priorityMarkup+'</div><span class="chip status">'+escapeHtml(card.status)+'</span><p class="state">'+escapeHtml(card.purpose)+'</p><div class="meta"><span>Owner: '+escapeHtml(card.owner)+'</span><span>Opened '+escapeHtml(opened.date)+' · '+escapeHtml(opened.days)+'</span><span class="age">Updated '+escapeHtml(card.last)+'</span></div></article>';
     };
   };
 
@@ -314,7 +343,8 @@ renderRestored();
     $('#modalTitle').textContent=card.topic;
     $('#modalState').textContent=card.state;
     const priorityDetail=activePriority(card)?`<div class="detail"><small>Priority</small><strong>${escapeHtml(activePriority(card))}</strong></div>`:'';
-    $('#modalDetails').innerHTML=`<div class="detail"><small>Owner</small><strong>${escapeHtml(card.owner)}</strong></div><div class="detail"><small>Status</small><strong>${escapeHtml(card.status)}</strong></div>${priorityDetail}<div class="detail"><small>Target / closes when</small><strong>${escapeHtml(card.target)}</strong></div><div class="detail"><small>Last update</small><strong>${escapeHtml(card.last)} · ${escapeHtml(card.age)}</strong></div><div class="detail"><small>Source count</small><strong>${card.history.length} cited entries</strong></div><div class="detail" style="grid-column:1/-1"><small>Recommended next action · Beta - AI Generated</small><strong>${escapeHtml(card.nextAction||'Review the latest evidence and identify the smallest next move.')}</strong></div>`;
+    const opened=openSummaryForCard(card);
+    $('#modalDetails').innerHTML=`<div class="detail"><small>Owner</small><strong>${escapeHtml(card.owner)}</strong></div><div class="detail"><small>Status</small><strong>${escapeHtml(card.status)}</strong></div>${priorityDetail}<div class="detail"><small>Open Date / Total Days Open</small><strong>${escapeHtml(opened.date)} · ${escapeHtml(opened.days)}</strong></div><div class="detail"><small>Last update</small><strong>${escapeHtml(card.last)}</strong></div><div class="detail"><small>Source count</small><strong>${card.history.length} cited entries</strong></div><div class="detail" style="grid-column:1/-1"><small>Recommended next action · Beta - AI Generated</small><strong>${escapeHtml(card.nextAction||'Review the latest evidence and identify the smallest next move.')}</strong></div>`;
     const history=[...card.history].sort((a,b)=>{const parse=value=>{const parts=String(value).split(' ');return new Date(`${parts[0]} ${parts[1]}, 2026`).getTime();};return parse(b[0])-parse(a[0]);});
     $('#modalHistory').innerHTML=history.map(entry=>`<div class="history-entry"><time>${escapeHtml(entry[0])}</time><p>${escapeHtml(entry[1])}</p><div class="source">${escapeHtml(entry[2])}</div></div>`).join('');
     $('#modalWrap').classList.add('open');
