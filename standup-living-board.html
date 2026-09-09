@@ -167,8 +167,12 @@ renderRestored();
 .group-index .filter-search-header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:8px}
 .group-index .filter-search-header .facet-heading{margin:0}
 .group-index .filter-search-header #search{min-width:260px;width:320px;margin:0}
+.task-scope-toggle{display:inline-flex;gap:2px;margin-left:auto;background:#dcecf6;border:1px solid #bdd6e7;border-radius:999px;padding:2px}
+.task-scope-toggle button{border:0;background:transparent;border-radius:999px;color:var(--muted);cursor:pointer;font:700 11px inherit;padding:5px 12px}
+.task-scope-toggle button.active{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(22,34,48,.1)}
+.task-scope-toggle button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .toolbar:has(#search){display:none}
-@media(max-width:650px){.group-index .filter-search-header{align-items:stretch;flex-direction:column;gap:8px}.group-index .filter-search-header #search{width:100%;min-width:0}}
+@media(max-width:650px){.group-index .filter-search-header{align-items:stretch;flex-direction:column;gap:8px}.group-index .filter-search-header #search{width:100%;min-width:0}.task-scope-toggle{margin-left:0;align-self:flex-start}}
 </style>
 <script>
 (function(){
@@ -238,8 +242,53 @@ renderRestored();
 (function(){
   const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
   const activePriority=card=>isClosed(card)?'':String(card.priority||'').trim();
+  let restoredTaskScope='open';
+  const scopeAllowsCard=card=>restoredTaskScope==='all'||!isClosed(card);
+  const parseBoardDate=value=>{
+    const text=String(value||'').trim();
+    if(!text)return null;
+    const currentYear=new Date().getFullYear();
+    const candidate=/\d{4}/.test(text)?new Date(text):new Date(`${text}, ${currentYear}`);
+    return Number.isNaN(candidate.getTime())?null:candidate;
+  };
+  const formatBoardDate=date=>{
+    if(!date)return 'Unknown';
+    return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(date);
+  };
+  const startOfLocalDay=date=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const daysBetween=(start,end=new Date())=>{
+    if(!start)return '';
+    return Math.max(0,Math.floor((startOfLocalDay(end)-startOfLocalDay(start))/86400000));
+  };
+  const openDateForCard=card=>{
+    const dates=(card.history||[]).map(entry=>parseBoardDate(entry?.[0])).filter(Boolean);
+    return dates.length?new Date(Math.min(...dates.map(date=>date.getTime()))):parseBoardDate(card.last);
+  };
+  const openSummaryForCard=card=>{
+    const openDate=openDateForCard(card);
+    const totalDays=daysBetween(openDate);
+    return {
+      date:formatBoardDate(openDate),
+      days:totalDays===''?'Unknown':`${totalDays} ${totalDays===1?'day':'days'} open`
+    };
+  };
+  const ageBucketOrder=['0–7 days','8–14 days','15–30 days','31+ days'];
+  const ageBucketForCard=card=>{
+    if(isClosed(card))return '';
+    const totalDays=daysBetween(openDateForCard(card));
+    if(totalDays==='')return '';
+    if(totalDays<=7)return '0–7 days';
+    if(totalDays<=14)return '8–14 days';
+    if(totalDays<=30)return '15–30 days';
+    return '31+ days';
+  };
   cards.forEach(card=>{card.displayPriority=activePriority(card);});
+  cards.forEach(card=>{card.displayAgeBucket=ageBucketForCard(card);});
   restoredFacetConfig.priority.field='displayPriority';
+  restoredFacetState.age=restoredFacetState.age||new Set();
+  restoredFacetConfig.age={label:'By Age',field:'displayAgeBucket',order:ageBucketOrder};
+  const scopedResults=()=>restoredResults().filter(scopeAllowsCard);
+  const scopedFiltered=()=>scopedResults().filter(card=>Object.entries(restoredFacetConfig).every(([key,info])=>!restoredFacetState[key].size||restoredFacetState[key].has(card[info.field])));
 
   cardTemplate=function(featured){
     return card=>{
@@ -248,7 +297,8 @@ renderRestored();
       }
       const priority=activePriority(card);
       const priorityMarkup=priority?'<span class="chip '+priorityClass(priority)+'">'+escapeHtml(priority)+'</span>':'';
-      return '<article class="card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="card-head"><div><div class="label">'+escapeHtml(card.id)+'</div><h4>'+escapeHtml(card.topic)+'</h4></div>'+priorityMarkup+'</div><span class="chip status">'+escapeHtml(card.status)+'</span><p class="state">'+escapeHtml(card.purpose)+'</p><div class="meta"><span>Owner: '+escapeHtml(card.owner)+'</span><span class="age">'+escapeHtml(card.last)+' · '+escapeHtml(card.age)+'</span></div></article>';
+      const opened=openSummaryForCard(card);
+      return '<article class="card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="card-head"><div><div class="label">'+escapeHtml(card.id)+'</div><h4>'+escapeHtml(card.topic)+'</h4></div>'+priorityMarkup+'</div><span class="chip status">'+escapeHtml(card.status)+'</span><p class="state">'+escapeHtml(card.purpose)+'</p><div class="meta"><span>Owner: '+escapeHtml(card.owner)+'</span><span>Opened '+escapeHtml(opened.date)+' · '+escapeHtml(opened.days)+'</span><span class="age">Updated '+escapeHtml(card.last)+'</span></div></article>';
     };
   };
 
@@ -256,7 +306,7 @@ renderRestored();
     const box=document.querySelector('#groupIndex');
     const searchControl=document.querySelector('#search');
     if(!box||!searchControl)return;
-    const source=restoredResults();
+    const source=restoredOpenFacet==='age'?scopedResults().filter(card=>!isClosed(card)):scopedResults();
     let header=box.querySelector('.filter-search-header');
     if(!header){
       header=document.createElement('div');
@@ -264,9 +314,18 @@ renderRestored();
       const heading=document.createElement('div');
       heading.className='facet-heading';
       heading.textContent='Filter & Search';
-      header.append(heading,searchControl);
+      const scope=document.createElement('div');
+      scope.className='task-scope-toggle';
+      header.append(heading,scope,searchControl);
       box.prepend(header);
     }
+    let scope=header.querySelector('.task-scope-toggle');
+    if(!scope){
+      scope=document.createElement('div');
+      scope.className='task-scope-toggle';
+      header.insertBefore(scope,searchControl);
+    }
+    scope.innerHTML=`<button type="button" class="${restoredTaskScope==='open'?'active':''}" data-task-scope="open" aria-pressed="${restoredTaskScope==='open'}">Open</button><button type="button" class="${restoredTaskScope==='all'?'active':''}" data-task-scope="all" aria-pressed="${restoredTaskScope==='all'}">All</button>`;
     box.querySelectorAll('.facet-heading').forEach(element=>{if(!header.contains(element))element.remove();});
     const controls=document.createElement('div');
     controls.className='facet-controls';
@@ -281,7 +340,7 @@ renderRestored();
     header.after(controls);
     if(restoredOpenFacet){
       const info=restoredFacetConfig[restoredOpenFacet];
-      const values=[...new Set(source.map(card=>card[info.field]))].filter(value=>String(value||'').trim()).sort((a,b)=>String(a).localeCompare(String(b)));
+      const values=[...new Set(source.map(card=>card[info.field]))].filter(value=>String(value||'').trim()).sort((a,b)=>info.order?info.order.indexOf(a)-info.order.indexOf(b):String(a).localeCompare(String(b)));
       const panel=document.createElement('div');panel.className='facet-panel';
       values.forEach(value=>{
         const button=document.createElement('button');
@@ -298,7 +357,7 @@ renderRestored();
   };
 
   renderRestored=function(){
-    const visible=restoredOpenFacet==='priority'?restoredFiltered().filter(card=>activePriority(card)):restoredFiltered();
+    const visible=['priority','age'].includes(restoredOpenFacet)?scopedFiltered().filter(card=>String(card[restoredFacetConfig[restoredOpenFacet].field]||'').trim()):scopedFiltered();
     $('#metrics').innerHTML=`<div class="metric"><strong>${cards.filter(card=>card.status!=='Closed').length}</strong><span>Active topics</span></div><div class="metric"><strong>${cards.filter(card=>card.status!=='Closed'&&card.priority==='Now').length}</strong><span>Now priority</span></div><div class="metric"><strong>${cards.filter(card=>card.status==='Blocked').length}</strong><span>Blocked</span></div><div class="metric"><strong>${cards.filter(card=>!card.target&&card.status!=='Closed').length}</strong><span>Missing target</span></div>`;
     $('#forum').innerHTML=cards.filter(card=>card.forum&&card.status!=='Closed').map(cardTemplate(true)).join('');
     const groups=restoredCardGroups(visible);
@@ -308,13 +367,23 @@ renderRestored();
     annotatePriorityRationales();
   };
 
+  restoredFacetIndex?.addEventListener('click',event=>{
+    const scope=event.target.closest('[data-task-scope]');
+    if(!scope)return;
+    restoredTaskScope=scope.dataset.taskScope==='all'?'all':'open';
+    Object.values(restoredFacetState).forEach(selection=>selection.clear());
+    renderRestored();
+    document.querySelector('#groupIndex')?.closest('section')?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+
   openModal=function(id){
     const card=cards.find(item=>item.id===id);if(!card)return;
     $('#modalArea').textContent=card.area+' · '+card.id;
     $('#modalTitle').textContent=card.topic;
     $('#modalState').textContent=card.state;
     const priorityDetail=activePriority(card)?`<div class="detail"><small>Priority</small><strong>${escapeHtml(activePriority(card))}</strong></div>`:'';
-    $('#modalDetails').innerHTML=`<div class="detail"><small>Owner</small><strong>${escapeHtml(card.owner)}</strong></div><div class="detail"><small>Status</small><strong>${escapeHtml(card.status)}</strong></div>${priorityDetail}<div class="detail"><small>Target / closes when</small><strong>${escapeHtml(card.target)}</strong></div><div class="detail"><small>Last update</small><strong>${escapeHtml(card.last)} · ${escapeHtml(card.age)}</strong></div><div class="detail"><small>Source count</small><strong>${card.history.length} cited entries</strong></div><div class="detail" style="grid-column:1/-1"><small>Recommended next action · Beta - AI Generated</small><strong>${escapeHtml(card.nextAction||'Review the latest evidence and identify the smallest next move.')}</strong></div>`;
+    const opened=openSummaryForCard(card);
+    $('#modalDetails').innerHTML=`<div class="detail"><small>Owner</small><strong>${escapeHtml(card.owner)}</strong></div><div class="detail"><small>Status</small><strong>${escapeHtml(card.status)}</strong></div>${priorityDetail}<div class="detail"><small>Open Date / Total Days Open</small><strong>${escapeHtml(opened.date)} · ${escapeHtml(opened.days)}</strong></div><div class="detail"><small>Last update</small><strong>${escapeHtml(card.last)}</strong></div><div class="detail"><small>Source count</small><strong>${card.history.length} cited entries</strong></div><div class="detail" style="grid-column:1/-1"><small>Recommended next action · Beta - AI Generated</small><strong>${escapeHtml(card.nextAction||'Review the latest evidence and identify the smallest next move.')}</strong></div>`;
     const history=[...card.history].sort((a,b)=>{const parse=value=>{const parts=String(value).split(' ');return new Date(`${parts[0]} ${parts[1]}, 2026`).getTime();};return parse(b[0])-parse(a[0]);});
     $('#modalHistory').innerHTML=history.map(entry=>`<div class="history-entry"><time>${escapeHtml(entry[0])}</time><p>${escapeHtml(entry[1])}</p><div class="source">${escapeHtml(entry[2])}</div></div>`).join('');
     $('#modalWrap').classList.add('open');
