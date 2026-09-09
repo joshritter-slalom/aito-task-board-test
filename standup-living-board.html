@@ -234,5 +234,94 @@ renderRestored();
   refreshLabel.textContent=`Synced ${value('month')} ${value('day')}, ${value('year')} at ${value('hour')}:${value('minute')} ${value('dayPeriod')} Eastern`;
 })();
 </script>
+<script>
+(function(){
+  const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
+  const activePriority=card=>isClosed(card)?'':String(card.priority||'').trim();
+  cards.forEach(card=>{card.displayPriority=activePriority(card);});
+  restoredFacetConfig.priority.field='displayPriority';
+
+  cardTemplate=function(featured){
+    return card=>{
+      if(featured){
+        return '<article class="forum-card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="label">'+escapeHtml(card.area)+' · '+escapeHtml(card.id)+'</div><h3>'+escapeHtml(card.topic)+'</h3><p><strong>'+escapeHtml(card.owner)+'</strong> · '+escapeHtml(card.purpose)+'</p></article>';
+      }
+      const priority=activePriority(card);
+      const priorityMarkup=priority?'<span class="chip '+priorityClass(priority)+'">'+escapeHtml(priority)+'</span>':'';
+      return '<article class="card" data-id="'+escapeHtml(card.id)+'" tabindex="0" role="button"><div class="card-head"><div><div class="label">'+escapeHtml(card.id)+'</div><h4>'+escapeHtml(card.topic)+'</h4></div>'+priorityMarkup+'</div><span class="chip status">'+escapeHtml(card.status)+'</span><p class="state">'+escapeHtml(card.purpose)+'</p><div class="meta"><span>Owner: '+escapeHtml(card.owner)+'</span><span class="age">'+escapeHtml(card.last)+' · '+escapeHtml(card.age)+'</span></div></article>';
+    };
+  };
+
+  buildRestoredFacets=function(){
+    const box=document.querySelector('#groupIndex');
+    const searchControl=document.querySelector('#search');
+    if(!box||!searchControl)return;
+    const source=restoredResults();
+    let header=box.querySelector('.filter-search-header');
+    if(!header){
+      header=document.createElement('div');
+      header.className='filter-search-header';
+      const heading=document.createElement('div');
+      heading.className='facet-heading';
+      heading.textContent='Filter & Search';
+      header.append(heading,searchControl);
+      box.prepend(header);
+    }
+    box.querySelectorAll('.facet-heading').forEach(element=>{if(!header.contains(element))element.remove();});
+    const controls=document.createElement('div');
+    controls.className='facet-controls';
+    Object.entries(restoredFacetConfig).forEach(([key,info])=>{
+      const button=document.createElement('button');
+      button.type='button';button.className='facet-parent'+(restoredOpenFacet===key?' active':'');
+      button.dataset.restoredParent=key;button.setAttribute('aria-expanded',String(restoredOpenFacet===key));button.textContent=info.label;
+      controls.appendChild(button);
+    });
+    box.querySelector('.facet-controls')?.remove();
+    box.querySelector('.facet-panel')?.remove();
+    header.after(controls);
+    if(restoredOpenFacet){
+      const info=restoredFacetConfig[restoredOpenFacet];
+      const values=[...new Set(source.map(card=>card[info.field]))].filter(value=>String(value||'').trim()).sort((a,b)=>String(a).localeCompare(String(b)));
+      const panel=document.createElement('div');panel.className='facet-panel';
+      values.forEach(value=>{
+        const button=document.createElement('button');
+        const active=restoredFacetState[restoredOpenFacet].has(value);
+        button.type='button';button.className='facet-link'+(active?' active':'');button.dataset.restoredFacet=restoredOpenFacet;button.dataset.restoredValue=value;button.setAttribute('aria-pressed',String(active));
+        button.textContent=value;
+        const count=document.createElement('span');
+        count.textContent=source.filter(card=>card[info.field]===value).length;
+        button.appendChild(count);
+        panel.appendChild(button);
+      });
+      controls.after(panel);
+    }
+  };
+
+  renderRestored=function(){
+    const visible=restoredOpenFacet==='priority'?restoredFiltered().filter(card=>activePriority(card)):restoredFiltered();
+    $('#metrics').innerHTML=`<div class="metric"><strong>${cards.filter(card=>card.status!=='Closed').length}</strong><span>Active topics</span></div><div class="metric"><strong>${cards.filter(card=>card.status!=='Closed'&&card.priority==='Now').length}</strong><span>Now priority</span></div><div class="metric"><strong>${cards.filter(card=>card.status==='Blocked').length}</strong><span>Blocked</span></div><div class="metric"><strong>${cards.filter(card=>!card.target&&card.status!=='Closed').length}</strong><span>Missing target</span></div>`;
+    $('#forum').innerHTML=cards.filter(card=>card.forum&&card.status!=='Closed').map(cardTemplate(true)).join('');
+    const groups=restoredCardGroups(visible);
+    $('#cards').innerHTML=Object.entries(groups).filter(([label])=>String(label||'').trim()).map(([label,items])=>`<section class="group"><h3>${escapeHtml(label)} <span style="color:var(--muted);font-weight:400">${items.length}</span></h3>${items.map(cardTemplate(false)).join('')}</section>`).join('')||'<div class="empty">No topics match these filters.</div>';
+    document.querySelectorAll('.card,.forum-card').forEach(element=>{element.addEventListener('click',()=>openModal(element.dataset.id));element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openModal(element.dataset.id);}});});
+    buildRestoredFacets();
+    annotatePriorityRationales();
+  };
+
+  openModal=function(id){
+    const card=cards.find(item=>item.id===id);if(!card)return;
+    $('#modalArea').textContent=card.area+' · '+card.id;
+    $('#modalTitle').textContent=card.topic;
+    $('#modalState').textContent=card.state;
+    const priorityDetail=activePriority(card)?`<div class="detail"><small>Priority</small><strong>${escapeHtml(activePriority(card))}</strong></div>`:'';
+    $('#modalDetails').innerHTML=`<div class="detail"><small>Owner</small><strong>${escapeHtml(card.owner)}</strong></div><div class="detail"><small>Status</small><strong>${escapeHtml(card.status)}</strong></div>${priorityDetail}<div class="detail"><small>Target / closes when</small><strong>${escapeHtml(card.target)}</strong></div><div class="detail"><small>Last update</small><strong>${escapeHtml(card.last)} · ${escapeHtml(card.age)}</strong></div><div class="detail"><small>Source count</small><strong>${card.history.length} cited entries</strong></div><div class="detail" style="grid-column:1/-1"><small>Recommended next action · Beta - AI Generated</small><strong>${escapeHtml(card.nextAction||'Review the latest evidence and identify the smallest next move.')}</strong></div>`;
+    const history=[...card.history].sort((a,b)=>{const parse=value=>{const parts=String(value).split(' ');return new Date(`${parts[0]} ${parts[1]}, 2026`).getTime();};return parse(b[0])-parse(a[0]);});
+    $('#modalHistory').innerHTML=history.map(entry=>`<div class="history-entry"><time>${escapeHtml(entry[0])}</time><p>${escapeHtml(entry[1])}</p><div class="source">${escapeHtml(entry[2])}</div></div>`).join('');
+    $('#modalWrap').classList.add('open');
+  };
+
+  renderRestored();
+})();
+</script>
 </body>
 </html>
