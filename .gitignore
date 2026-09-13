@@ -4,5 +4,12 @@
 *.png
 *.inspect.*
 
+# The sanitized starter workbook is intentionally tracked.
+!templates/
+!templates/task-update-workbook-template.xlsx
+
 # Operating-system files
 .DS_Store
+# Local workbook builder outputs and inspection artifacts
+.build/
+*.inspect.ndjson

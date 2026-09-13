@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "board": {
+    "title": "Example Team Task Board",
+    "timezone": "America/New_York",
+    "lastSyncedAt": "2026-01-15T22:00:00Z"
+  },
+  "cards": [
+    {
+      "id": "EX-001",
+      "title": "Define the example workstream",
+      "summary": "Align the team on scope, owner, and next milestone.",
+      "group": "Planning",
+      "owner": "Example Owner",
+      "status": "In progress",
+      "priority": "Now",
+      "target": "Confirm scope and milestone",
+      "last": "Jan 15",
+      "history": [
+        {
+          "date": "2026-01-15",
+          "text": "The team confirmed the next milestone and assigned an owner.",
+          "source": "Example Team Meeting · Jan 15"
+        }
+      ]
+    }
+  ],
+  "removedCards": []
+}
