@@ -413,7 +413,7 @@ renderRestored();
 })();
 </script>
 <style>
-.priority-title{align-items:center}.priority-toggle{border:1px solid var(--line);background:var(--white);border-radius:999px;padding:7px 12px;color:var(--navy);font:600 12px inherit;cursor:pointer}.priority-toggle:hover{border-color:#9fc0d3;background:#eef6fb}.priority-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.priority-toggle span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-left:4px;padding:1px 5px;border-radius:999px;background:#eef6fb;color:var(--blue)}
+.priority-title{align-items:center}.priority-toggle{border:1px solid var(--line);background:var(--white);border-radius:999px;padding:7px 12px;color:var(--navy);font:600 12px inherit;cursor:pointer}.priority-toggle:hover{border-color:#9fc0d3;background:#eef6fb}.priority-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.priority-toggle span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-left:4px;padding:1px 5px;border-radius:999px;background:#eef6fb;color:var(--blue)}.forum[hidden]{display:none}
 </style>
 <script>
 (function(){
@@ -438,11 +438,14 @@ renderRestored();
   const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
   const priorityTopics=()=>{
     const explicitIds=new Set(Array.isArray(window.meetingPriorityCardIds)?window.meetingPriorityCardIds:[]);
-    return cards.filter(card=>!isClosed(card)&&(
-      explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true||
-      String(card.status||'').toLowerCase()==='blocked'||String(card.status||'').toLowerCase()==='needs decision'||
-      (daysSince(card.last)??0)>=15
-    )).sort((a,b)=>{
+    return cards.filter(card=>{
+      if(isClosed(card))return false;
+      const status=String(card.status||'').toLowerCase();
+      const days=daysSince(card.last)??0;
+      return explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true||
+        ((status==='blocked'||status==='needs decision')&&days>=7)||
+        (status==='in progress'&&days>=14);
+    }).sort((a,b)=>{
       const explicit=card=>explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true;
       const rank=card=>explicit(card)?0:String(card.status||'').toLowerCase()==='needs decision'?1:String(card.status||'').toLowerCase()==='blocked'?2:3;
       return rank(a)-rank(b)||(daysSince(b.last)??0)-(daysSince(a.last)??0);
