@@ -413,7 +413,7 @@ renderRestored();
 })();
 </script>
 <style>
-.priority-title{align-items:center}.priority-toggle{border:1px solid var(--line);background:var(--white);border-radius:999px;padding:7px 12px;color:var(--navy);font:600 12px inherit;cursor:pointer}.priority-toggle:hover{border-color:#9fc0d3;background:#eef6fb}.priority-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.priority-toggle span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-left:4px;padding:1px 5px;border-radius:999px;background:#eef6fb;color:var(--blue)}.forum[hidden]{display:none}
+.priority-title{align-items:center}.priority-toggle{border:1px solid var(--line);background:var(--white);border-radius:999px;padding:7px 12px;color:var(--navy);font:600 12px inherit;cursor:pointer}.priority-toggle:hover{border-color:#9fc0d3;background:#eef6fb}.priority-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.priority-toggle span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-left:4px;padding:1px 5px;border-radius:999px;background:#eef6fb;color:var(--blue)}.forum{display:block}.forum[hidden]{display:none}.priority-category{margin:0 0 18px}.priority-category:last-child{margin-bottom:0}.priority-category-title{display:flex;align-items:baseline;gap:7px;margin:0 0 9px;color:var(--navy);font-size:13px}.priority-category-title span{color:var(--muted);font-size:12px;font-weight:500}.priority-category-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:980px){.priority-category-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.priority-category-cards{grid-template-columns:1fr}}
 </style>
 <script>
 (function(){
@@ -451,10 +451,20 @@ renderRestored();
       return rank(a)-rank(b)||(daysSince(b.last)??0)-(daysSince(a.last)??0);
     });
   };
+  const priorityCategory=card=>{
+    const explicitIds=new Set(Array.isArray(window.meetingPriorityCardIds)?window.meetingPriorityCardIds:[]);
+    if(explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true)return 'Manually selected';
+    const status=String(card.status||'').toLowerCase();
+    if(status==='blocked')return 'Blocked';
+    if(status==='needs decision')return 'Needs decision';
+    return 'Stale in progress';
+  };
+  const priorityCategoryOrder=['Manually selected','Blocked','Needs decision','Stale in progress'];
   const renderPriorityTopics=()=>{
     const topics=priorityTopics();
     priorityCount.textContent=topics.length;
-    forum.innerHTML=topics.map(cardTemplate(true)).join('');
+    const groups=priorityCategoryOrder.map(category=>[category,topics.filter(card=>priorityCategory(card)===category)]).filter(([,items])=>items.length);
+    forum.innerHTML=groups.map(([category,items])=>'<section class="priority-category"><h3 class="priority-category-title">'+escapeHtml(category)+' <span>'+items.length+'</span></h3><div class="priority-category-cards">'+items.map(cardTemplate(true)).join('')+'</div></section>').join('');
     forum.hidden=priorityToggle.getAttribute('aria-expanded')!=='true';
     document.querySelectorAll('#forum .forum-card').forEach(element=>{
       element.addEventListener('click',()=>openModal(element.dataset.id));
