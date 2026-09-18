@@ -19,7 +19,7 @@
 <section id="board-tab">
     <div class="toolbar"><input id="search" type="search" placeholder="Search any card field or ID, e.g. STB-001 or 01" aria-label="Search any card field or ID"><select id="groupFilter"><option value="all">All groups</option></select><select id="ownerFilter"><option value="all">All owners</option></select><select id="statusFilter"><option value="all">All statuses</option></select><select id="priorityFilter"><option value="all">All priorities</option></select></div>
     <div class="summary" id="metrics"></div>
-    <section><div class="section-title"><h2>Recommended priority discussion topics</h2><p>AI-selected focus for the next meeting</p></div><div class="forum" id="forum"></div></section>
+    <section><div class="section-title priority-title"><div><h2>Priority topics</h2><p>Tasks that are blocked, need a decision, or haven't been recently updated</p></div><button type="button" class="priority-toggle" id="priorityToggle" aria-expanded="false">Show topics <span id="priorityCount">0</span></button></div><div class="forum" id="forum" hidden></div></section>
     <section><div class="section-title"><h2>Open topics</h2><p>Grouped dynamically by current workstream</p></div><div class="group-index" id="groupIndex"></div><div class="cards" id="cards"></div></section>
   </section>
   <section id="howto-tab" hidden><div class="howto"><h2>How this board works</h2><p>This is a read-only view of open standup work. It is refreshed automatically from the work already happening in the team.</p><div class="callout"><strong>Keep it lightweight.</strong> Share useful movement, blockers, decisions, owner changes, target changes, or closure signals through standup, the scoped chat, or the update workbook.</div><h3>Three ways information reaches the board</h3><ol><li><strong>Discuss it in the meeting.</strong> The meeting summary is written to the vault and picked up by the board agent.</li><li><strong>Post it in the standup chat.</strong> A "Board update" prefix helps, but clearly relevant plain-text updates can also be recognized.</li><li><strong>Add it to the supporting Excel queue.</strong> Add a row when an update did not happen in the meeting or chat.</li></ol><h3>Timing</h3><ul><li>Updates by 10:00 p.m. ET are included in the next overnight refresh.</li><li>Updates by 11:00 a.m. ET on Monday or Thursday are included in that day's pre-meeting refresh.</li></ul><h3>Scope</h3><p>Only the <em>GenAI Internal Transformation - Standup!</em> chat is read. The board is not a replacement for Jira, ADO, governance backlogs, or formal task systems.</p></div></section>
@@ -235,7 +235,29 @@ renderRestored();
     hour:'numeric',minute:'2-digit',hour12:true
   }).formatToParts(date);
   const value=type=>parts.find(part=>part.type===type)?.value||'';
-  refreshLabel.textContent=`Synced Sep 18, 2026 · 2026-09-18T02:31:27.223Z</script>
+  refreshLabel.textContent=`Synced ${value('month')} ${value('day')}, ${value('year')} · ${raw}`;
+})();
+</script>
+<script>
+(function(){
+  const currentVersion='2026-09-18T02:31:27.223Z';
+  const pollIntervalMs=60*60*1000;
+  async function checkForBoardUpdate(){
+    try{
+      const response=await fetch('/standup-board-version.json?check='+Date.now(),{cache:'no-store',headers:{Accept:'application/json'}});
+      if(!response.ok)return;
+      const payload=await response.json();
+      if(!payload.version||payload.version===currentVersion)return;
+      const next=new URL(window.location.href);
+      next.searchParams.set('board-reload',String(Date.now()));
+      window.location.replace(next.toString());
+    }catch(_error){
+      // A transient version-check failure should not interrupt board use.
+    }
+  }
+  window.setTimeout(checkForBoardUpdate,pollIntervalMs);
+})();
+</script>
 <script>
 (function(){
   const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
@@ -387,6 +409,66 @@ renderRestored();
     $('#modalWrap').classList.add('open');
   };
 
+  renderRestored();
+})();
+</script>
+<style>
+.priority-title{align-items:center}.priority-toggle{border:1px solid var(--line);background:var(--white);border-radius:999px;padding:7px 12px;color:var(--navy);font:600 12px inherit;cursor:pointer}.priority-toggle:hover{border-color:#9fc0d3;background:#eef6fb}.priority-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.priority-toggle span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-left:4px;padding:1px 5px;border-radius:999px;background:#eef6fb;color:var(--blue)}.forum[hidden]{display:none}
+</style>
+<script>
+(function(){
+  const priorityToggle=document.querySelector('#priorityToggle');
+  const priorityCount=document.querySelector('#priorityCount');
+  const forum=document.querySelector('#forum');
+  if(!priorityToggle||!priorityCount||!forum)return;
+  const parseDate=value=>{
+    const text=String(value||'').trim();
+    if(!text)return null;
+    const candidate=/\d{4}/.test(text)?new Date(text):new Date(`${text}, ${new Date().getFullYear()}`);
+    return Number.isNaN(candidate.getTime())?null:candidate;
+  };
+  const daysSince=value=>{
+    const date=parseDate(value);
+    if(!date)return null;
+    const today=new Date();
+    const start=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+    const end=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    return Math.max(0,Math.floor((end-start)/86400000));
+  };
+  const isClosed=card=>String(card.status||'').toLowerCase()==='closed';
+  const priorityTopics=()=>{
+    const explicitIds=new Set(Array.isArray(window.meetingPriorityCardIds)?window.meetingPriorityCardIds:[]);
+    return cards.filter(card=>{
+      if(isClosed(card))return false;
+      const status=String(card.status||'').toLowerCase();
+      const days=daysSince(card.last)??0;
+      return explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true||
+        ((status==='blocked'||status==='needs decision')&&days>=7)||
+        (status==='in progress'&&days>=14);
+    }).sort((a,b)=>{
+      const explicit=card=>explicitIds.has(card.id)||card.meetingFocus===true||card.priorityTopic===true;
+      const rank=card=>explicit(card)?0:String(card.status||'').toLowerCase()==='needs decision'?1:String(card.status||'').toLowerCase()==='blocked'?2:3;
+      return rank(a)-rank(b)||(daysSince(b.last)??0)-(daysSince(a.last)??0);
+    });
+  };
+  const renderPriorityTopics=()=>{
+    const topics=priorityTopics();
+    priorityCount.textContent=topics.length;
+    forum.innerHTML=topics.map(cardTemplate(true)).join('');
+    forum.hidden=priorityToggle.getAttribute('aria-expanded')!=='true';
+    document.querySelectorAll('#forum .forum-card').forEach(element=>{
+      element.addEventListener('click',()=>openModal(element.dataset.id));
+      element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openModal(element.dataset.id);}});
+    });
+  };
+  priorityToggle.addEventListener('click',()=>{
+    const expanded=priorityToggle.getAttribute('aria-expanded')==='true';
+    priorityToggle.setAttribute('aria-expanded',String(!expanded));
+    priorityToggle.firstChild.textContent=expanded?'Show topics ':'Hide topics ';
+    renderPriorityTopics();
+  });
+  const existingRender=renderRestored;
+  renderRestored=function(){existingRender();renderPriorityTopics();};
   renderRestored();
 })();
 </script>
