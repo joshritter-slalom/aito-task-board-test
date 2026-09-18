@@ -468,8 +468,16 @@ renderRestored();
     const topics=priorityTopics();
     priorityCount.textContent=topics.length;
     const groups=priorityCategoryOrder.map(category=>[category,topics.filter(card=>priorityCategory(card)===category)]).filter(([,items])=>items.length);
-    forum.innerHTML=groups.map(([category,items],index)=>{const panelId='priority-category-panel-'+index;return '<section class="priority-category"><h3 class="priority-category-title"><button type="button" class="priority-category-toggle" data-priority-category-toggle data-panel="'+panelId+'" aria-expanded="true"><svg class="priority-caret priority-category-caret expanded" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg><span>'+escapeHtml(category)+'</span><span class="priority-category-count">'+items.length+'</span></button></h3><div class="priority-category-cards" id="'+panelId+'">'+items.map(cardTemplate(true)).join('')+'</div></section>';}).join('');
+    forum.innerHTML=groups.map(([category,items],index)=>{const panelId='priority-category-panel-'+index;return '<section class="priority-category"><h3 class="priority-category-title"><button type="button" class="priority-category-toggle" data-priority-category-toggle data-panel="'+panelId+'" aria-expanded="false"><svg class="priority-caret priority-category-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg><span>'+escapeHtml(category)+'</span><span class="priority-category-count">'+items.length+'</span></button></h3><div class="priority-category-cards" id="'+panelId+'" hidden>'+items.map(cardTemplate(true)).join('')+'</div></section>';}).join('');
     forum.hidden=priorityToggle.getAttribute('aria-expanded')!=='true';
+    document.querySelectorAll('#forum .priority-category-toggle').forEach(toggle=>toggle.addEventListener('click',()=>{
+      const panel=document.getElementById(toggle.dataset.panel);
+      if(!panel)return;
+      const expanded=toggle.getAttribute('aria-expanded')==='true';
+      toggle.setAttribute('aria-expanded',String(!expanded));
+      panel.hidden=expanded;
+      toggle.querySelector('.priority-category-caret')?.classList.toggle('expanded',!expanded);
+    }));
     document.querySelectorAll('#forum .forum-card').forEach(element=>{
       element.addEventListener('click',()=>openModal(element.dataset.id));
       element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openModal(element.dataset.id);}});
@@ -481,17 +489,6 @@ renderRestored();
     priorityToggleLabel.textContent=expanded?'Show topics':'Hide topics';
     priorityCaret.classList.toggle('expanded',!expanded);
     renderPriorityTopics();
-  });
-  forum.addEventListener('click',event=>{
-    const toggle=event.target.closest('[data-priority-category-toggle]');
-    if(!toggle)return;
-    event.stopPropagation();
-    const panel=document.getElementById(toggle.dataset.panel);
-    if(!panel)return;
-    const expanded=toggle.getAttribute('aria-expanded')==='true';
-    toggle.setAttribute('aria-expanded',String(!expanded));
-    panel.hidden=expanded;
-    toggle.querySelector('.priority-category-caret')?.classList.toggle('expanded',!expanded);
   });
   const existingRender=renderRestored;
   renderRestored=function(){existingRender();renderPriorityTopics();};
