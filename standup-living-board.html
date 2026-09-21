@@ -13,7 +13,7 @@
 <main class="shell" id="standup-board">
   <header class="topbar">
     <div><div class="eyebrow">GenAI Internal Transformation</div><h1>GenAI Standup Team Task Board</h1><div class="subtitle">A lightweight view of open threads, current movement, and the work that needs attention before the next roundtable.</div></div>
-    <div class="refresh"><span class="dot"></span><span>Synced Sep 17, 2026 · 2026-09-17T16:00:19.602Z</span></div>
+    <div class="refresh"><span class="dot"></span><span class="sync-value" data-sync-iso="2026-09-19T02:32:02.588Z">Synced Sep 18, 2026 at 10:32 PM Eastern</span></div>
   </header>
   <nav class="tabs" aria-label="Board sections"><button class="tab" aria-selected="true" data-tab="board">Live Board</button><button class="tab" aria-selected="false" data-tab="howto">How To Use</button></nav>
 <section id="board-tab">
@@ -228,7 +228,7 @@ renderRestored();
 (function(){
   const refreshLabel=document.querySelector('.refresh span:last-child');
   if(!refreshLabel)return;
-  const raw=refreshLabel.textContent.match(/·\s*(.+)$/)?.[1]?.trim();
+  const raw=refreshLabel.dataset.syncIso||refreshLabel.textContent.match(/·\s*(.+)$/)?.[1]?.trim();
   if(!raw)return;
   const date=new Date(raw);
   if(Number.isNaN(date.getTime()))return;
@@ -237,7 +237,9 @@ renderRestored();
     hour:'numeric',minute:'2-digit',hour12:true
   }).formatToParts(date);
   const value=type=>parts.find(part=>part.type===type)?.value||'';
-  refreshLabel.textContent=`Synced Sep 19, 2026 · 2026-09-19T02:32:02.588Z</script>
+  refreshLabel.textContent=`Synced ${value('month')} ${value('day')}, ${value('year')} at ${value('hour')}:${value('minute')} ${value('dayPeriod')} Eastern`;
+})();
+</script>
 <script>
 (function(){
   const currentVersion='2026-09-19T02:32:02.588Z';
