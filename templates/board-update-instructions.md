@@ -26,7 +26,7 @@ Updates are processed on the team’s scheduled cadence. They are not expected t
 
 ## What makes an update useful
 
-Describe what changed and the latest status. Include an owner, priority, and target date when known. A short update is fine; not every field needs to be completed every time.
+Describe what changed and the latest status. Include an owner, High/Med/Low priority, and target date when known. A short update is fine; not every field needs to be completed every time.
 
 ## Administrator placeholders
 
